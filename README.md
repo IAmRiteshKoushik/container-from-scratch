@@ -1,6 +1,6 @@
 # Build your own container in Go
 
-> ![WARNING]
+> [!WARNING]
 > This repository must be cloned and run in Linux / Unix environments only. It 
 is not built for windows.
 
@@ -32,7 +32,7 @@ with your regular filesystem. Everything within the chroot environment is penned
 in and contained. Nothing in the chroot environment can see out past its own, 
 special root directory.
 
-Learn how to create a chroot directory here - [link](https://www.howtogeek.com/441534/how-to-use-the-chroot-command-on-linux/)
+Learn how to create a chroot directory here - [link](https://www.howtogeek.com/441534/how-to-use-the-chroot-command-on-linux/)  
 Name this a `ubuntu-fs` and to run it in the code. The new container getting 
 created will use this as the root point. This need not be the actual ubuntu 
 filesystem unless and until you are running on ubuntu.
