@@ -37,4 +37,24 @@ Name this a `ubuntu-fs` and to run it in the code. The new container getting
 created will use this as the root point. This need not be the actual ubuntu 
 filesystem unless and until you are running on ubuntu.
 
+> [!NOTE]
+> `chroot` creation is at times, OS dependent and corresponding OS friendly 
+> guides are available on the internet. Personally, the above link did not 
+> workout for me as I am using Arch but for an Ubuntu user it would work just 
+> fine.
+
+Alternative is to get a filesystem and chroot into it programatically.
+```bash
+# Here, I am taking a redis docker container and extracting out the entire 
+# filesystem to chroot into it. Ultimately it is a linux filesystem and all the 
+# basic commands work. While it is not completely isolated and the host can 
+# still access it, a certain level of permission setup should do the trick.
+docker export $(docker create ubuntu) -o ubuntu.tar.gz
+mkdir ubuntu-fs && cd ubuntu-fs
+tar --no-same-owner --no-same-permissions --owner=0 --group=0 -mxf ../ubuntu.tar.gz
+```
+
+Another alternative suggested by a friend is to use `debootstrap` program. It 
+creates a debian environment inside a sub-directory and lets you access it.
+
 ## Cgroups

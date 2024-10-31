@@ -16,24 +16,25 @@ func main() {
 	switch os.Args[1] {
 	case "run":
 		run()
+	case "child":
+		child()
 	default:
 		panic("bad command")
 	}
 }
 
 func run() {
-	// You'll see the first argument that was the result of the go run main.go
-	// fmt.Printf("%v\n", os.Args[0])
 
-	fmt.Printf("Running %v\n", os.Args[2:])
-	cmd := exec.Command(os.Args[2], os.Args[3:]...)
+	// In-order to run the run() func followed by the child() func, we are /
+	fmt.Printf("Running %v as %d\n", os.Args[2:], os.Getpid())
+	cmd := exec.Command("/proc/self/exe", append([]string{"child"}, os.Args[2:]...)...)
 
 	// Setup defaults
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS,
+		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID,
 
 		// NOTE: While trying this out in linux (Arch), I ran into the problem where
 		//  spawning a new namespace was not permitted by the system unless being
@@ -58,6 +59,37 @@ func run() {
 	//  neither can you do it before cmd.Run(), it has to be done when cmd.Run()
 	//  is being executed. More details in the README.
 	// syscall.Sethostname([]byte("container"))
+}
+
+func child() {
+	fmt.Printf("Running %v as %d\n", os.Args[2:], os.Getpid())
+
+	// Here, when we are inside the child we need not setup a separate process
+	// but we do need to setup the hostname beforehand. This time it should
+	// already be in the new namespace
+	syscall.Sethostname([]byte("container"))
+
+	// NOTE:
+	// When a child is created, it needs to point to a separate filesystem
+	// that needs to be created. So there should be some kind of
+	// /root -> /container-volume-root
+	// By default it points to the global system root directory, but that needs
+	// to be changed. So, we create a separate filesystem manually and change the
+	// directory to that
+	syscall.Chroot("/home/rk/ubuntu-fs")
+	// After you have done chroot, it is undefined where the root directory is
+	// so you need to manually do that part
+	syscall.Chdir("/")
+	// In-order to run the `ps` command, we need to mount the proc directory
+	// because we are in a chroot environment ?
+	syscall.Mount("proc", "proc", "proc", 0, "")
+
+	cmd := exec.Command(os.Args[2], os.Args[3:]...)
+	cmd.Stdin = os.Stdin
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	cmd.Run()
+	syscall.Unmount("/proc", 0)
 }
 
 func must(err error) {
