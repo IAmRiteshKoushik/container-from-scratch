@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"syscall"
 )
 
@@ -34,7 +36,8 @@ func run() {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Cloneflags: syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID,
+		Cloneflags:   syscall.CLONE_NEWUTS | syscall.CLONE_NEWPID | syscall.CLONE_NEWNS,
+		Unshareflags: syscall.CLONE_NEWNS,
 
 		// NOTE: While trying this out in linux (Arch), I ran into the problem where
 		//  spawning a new namespace was not permitted by the system unless being
@@ -64,6 +67,8 @@ func run() {
 func child() {
 	fmt.Printf("Running %v as %d\n", os.Args[2:], os.Getpid())
 
+	cg() // calling out own control group to restrict scope of the container
+
 	// Here, when we are inside the child we need not setup a separate process
 	// but we do need to setup the hostname beforehand. This time it should
 	// already be in the new namespace
@@ -90,6 +95,25 @@ func child() {
 	cmd.Stdout = os.Stdout
 	cmd.Run()
 	syscall.Unmount("/proc", 0)
+}
+
+// Writing our own control-group
+func cg() {
+	cgroups := "/sys/fs/cgroup/"
+	pids := filepath.Join(cgroups, "pids")
+	err := os.Mkdir(pids, 0755)
+	if err != nil && !os.IsExist(err) {
+		panic(err)
+	}
+
+	// Inside my container there can only be 20 processes
+	must(os.WriteFile(filepath.Join(pids, "pids.max"), []byte("20"), 0700))
+
+	// NOTE: Did not work in my system (Arch Linux)
+	//  Removes the new cgroup in place after the container exits
+	// must(os.WriteFile(filepath.Join(pids, "notify_on_release"), []byte("1"), 0700))
+
+	must(os.WriteFile(filepath.Join(pids, "cgroup.procs"), []byte(strconv.Itoa(os.Getpid())), 0700))
 }
 
 func must(err error) {
